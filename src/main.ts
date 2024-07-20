@@ -95,15 +95,6 @@ function findUnusedFiles(
   return unusedFiles;
 }
 
-// Example usage
-// const graph = buildDependencyGraph(entryPoint);
-
-// console.log(
-//   graph.getDependencies(
-//     '../resaleai/apps/frontend/src/components/daybook/Whodunnit.vue'
-//   )
-// );
-
 program.parse();
 
 const args = program.args;
@@ -116,7 +107,3 @@ if (args[0] === 'report') {
   const unusedFiles = findUnusedFiles(graph, entryPoint, projectDir);
   unusedFiles.forEach((file) => console.log(file));
 }
-
-// console.log(graph.nodes.get(entryPoint));
-
-// graph.save('dependency-graph.json', projectDir);
