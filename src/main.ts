@@ -110,7 +110,7 @@ const args = program.args;
 const projectDir = path.resolve(args[args.length - 1]);
 const entryPoint = path.resolve(program.opts().entryPoint);
 
-const graph = DependencyGraph.load('dependency-graph.json');
+const graph = new DependencyGraph();
 
 if (args[0] === 'report') {
   const unusedFiles = findUnusedFiles(graph, entryPoint, projectDir);
