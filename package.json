@@ -1,0 +1,28 @@
+{
+  "name": "unused",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/main.js",
+  "files": [
+    "dist/*"
+  ],
+  "bin": {
+    "deadly": "dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Zavier Miller",
+  "license": "ISC",
+  "dependencies": {
+    "acorn-loose": "^8.4.0",
+    "acorn-walk": "^8.3.3",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.11",
+    "typescript": "^5.5.3"
+  }
+}
