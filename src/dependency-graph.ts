@@ -1,21 +1,24 @@
 import fs from 'fs';
 import path from 'path';
 
-type DependencyGraphNode = Set<string>;
-
 export default class DependencyGraph {
-  nodes: Map<string, DependencyGraphNode>;
+  dependencies: Map<string, Set<string>>;
+  dependents: Map<string, Set<string>>;
 
   constructor() {
-    this.nodes = new Map<string, DependencyGraphNode>();
+    this.dependencies = new Map<string, Set<string>>();
+    this.dependents = new Map<string, Set<string>>();
   }
 
   static load(filePath: string): DependencyGraph {
     const data = fs.readFileSync(filePath, 'utf-8');
     const d = JSON.parse(data);
     const graph = new DependencyGraph();
-    for (const [node, _] of d.nodes) {
-      graph.nodes.set(d.projectDir + node, new Set());
+
+    for (const [node, edges] of d.nodes) {
+      const fullNodePath = d.projectDir + node;
+      graph.dependencies.set(fullNodePath, new Set());
+      graph.dependents.set(fullNodePath, new Set());
     }
 
     for (const [node, edges] of d.nodes) {
@@ -28,16 +31,19 @@ export default class DependencyGraph {
   }
 
   addNode(filePath: string) {
-    if (!this.nodes.has(filePath)) {
-      this.nodes.set(filePath, new Set());
+    if (!this.dependencies.has(filePath)) {
+      this.dependencies.set(filePath, new Set());
+    }
+    if (!this.dependents.has(filePath)) {
+      this.dependents.set(filePath, new Set());
     }
   }
 
   addEdge(from: string, to: string) {
     this.addNode(from);
     this.addNode(to);
-    this.nodes.get(from)?.add(to);
-    this.nodes.get(to)?.add(from);
+    this.dependencies.get(from)?.add(to);
+    this.dependents.get(to)?.add(from);
   }
 
   hasPathToEntryPoint(
@@ -48,7 +54,7 @@ export default class DependencyGraph {
     if (start === end) return true;
     visited.add(start);
 
-    const neighbors = this.nodes.get(start) || new Set();
+    const neighbors = this.dependents.get(start) || new Set();
     for (const neighbor of neighbors) {
       if (!visited.has(neighbor)) {
         if (this.hasPathToEntryPoint(neighbor, end, visited)) {
@@ -60,26 +66,19 @@ export default class DependencyGraph {
     return false;
   }
 
-  getDependencies(filePath: string): DependencyGraphNode {
+  getDependencies(filePath: string): Set<string> {
     filePath = path.resolve(filePath);
-    return this.nodes.get(filePath) || new Set();
+    return this.dependencies.get(filePath) || new Set();
   }
 
   getDependents(filePath: string): Set<string> {
-    // get absolute file path
     filePath = path.resolve(filePath);
-    const dependents = new Set<string>();
-    for (const [node, edges] of this.nodes.entries()) {
-      if (edges.has(filePath)) {
-        dependents.add(node);
-      }
-    }
-    return dependents;
+    return this.dependents.get(filePath) || new Set();
   }
 
   save(filePath: string, projectDir: string = '') {
     projectDir = path.resolve(projectDir);
-    const nodesArr = [...this.nodes];
+    const nodesArr = [...this.dependencies];
     const data: { projectDir: string; nodes: any[] } = {
       projectDir,
       nodes: nodesArr.map(([node, edges]) => [

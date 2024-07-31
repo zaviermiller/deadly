@@ -5,6 +5,7 @@ import path from 'path';
 import DependencyGraph from './dependency-graph';
 import { parseImports, resolveImportPath } from './parse';
 import program from './cli';
+import process from 'process';
 
 function findClosestSrcDir(filePath: string) {
   let dir = path.dirname(filePath);
@@ -25,7 +26,10 @@ function getAllFiles(dir: string): string[] {
     file = path.join(dir, file);
     const stat = fs.statSync(file);
     if (stat && stat.isDirectory()) {
-      results = results.concat(getAllFiles(file));
+      // ignore node_modules
+      if (!file.includes('node_modules')) {
+        results = results.concat(getAllFiles(file));
+      }
     } else {
       const ext = path.extname(file).toLowerCase();
       const basename = path.basename(file).toLowerCase();
@@ -103,7 +107,17 @@ const entryPoint = path.resolve(program.opts().entryPoint);
 
 const graph = buildDependencyGraph(entryPoint);
 
-if (args[0] === 'report') {
-  const unusedFiles = findUnusedFiles(graph, entryPoint, projectDir);
-  unusedFiles.forEach((file) => console.log(file));
+switch (args[0]) {
+  case 'report':
+    const unusedFiles = findUnusedFiles(graph, entryPoint, projectDir);
+    unusedFiles.forEach((file) => console.log(file));
+    break;
+  case 'dependents':
+    const depFile = path.resolve(args[1]);
+    const dependents = graph.getDependents(depFile);
+    dependents.forEach((dependent) => console.log(dependent));
+    break;
+  default:
+    console.log('Invalid command');
+    process.exit(1);
 }

@@ -19,4 +19,9 @@ program
   .description('Generate a report of unused files')
   .option('-f, --format <format>', 'The format of the report', 'json');
 
+program
+  .command('dependents')
+  .description('List all dependents of a file')
+  .argument('<file>', 'The file to analyze');
+
 export default program;

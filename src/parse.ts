@@ -5,26 +5,26 @@ import path from 'path';
 import acorn from 'acorn-loose';
 import walk from 'acorn-walk';
 
-function showFileDependencies(
-  graph: DependencyGraph,
-  filePath: string
-): string {
-  if (!graph.nodes.has(filePath)) {
-    return `File not found in dependency graph: ${filePath}`;
-  }
+// function showFileDependencies(
+//   graph: DependencyGraph,
+//   filePath: string
+// ): string {
+//   if (!graph.nodes.has(filePath)) {
+//     return `File not found in dependency graph: ${filePath}`;
+//   }
 
-  const dependencies = graph.getDependencies(filePath);
+//   const dependencies = graph.getDependencies(filePath);
 
-  if (dependencies.size === 0) {
-    return `No dependencies found for ${filePath}`;
-  }
+//   if (dependencies.size === 0) {
+//     return `No dependencies found for ${filePath}`;
+//   }
 
-  const formattedDependencies = Array.from(dependencies)
-    .map((dep) => `  - ${dep}`)
-    .join('\n');
+//   const formattedDependencies = Array.from(dependencies)
+//     .map((dep) => `  - ${dep}`)
+//     .join('\n');
 
-  return `Dependencies for ${filePath}:\n${formattedDependencies}`;
-}
+//   return `Dependencies for ${filePath}:\n${formattedDependencies}`;
+// }
 
 function extractScriptContent(content: string): string {
   const scriptMatch = content.match(/<script[^>]*>([\s\S]*?)<\/script>/);
