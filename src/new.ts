@@ -97,7 +97,6 @@ function resolveExports(
   filePath: string,
   exportAllPaths: Set<string>
 ) {
-  const fileDir = path.dirname(filePath);
   walk.simple(ast, {
     ExportNamedDeclaration(node) {
       if (node.declaration) {
@@ -132,6 +131,25 @@ function resolveExports(
       }
       if (node.specifiers) {
         node.specifiers.forEach((specifier) => {
+          if (!node.source) {
+            // no source? try and resolve from imports or functions
+            // @ts-ignore
+            if (specifier.local.name in fileInfo.imports) {
+              // @ts-ignore
+              const importInfo = fileInfo.imports[specifier.local.name];
+              // @ts-ignore
+              fileInfo.exports[specifier.exported.name] = {
+                local: false,
+                // @ts-ignore
+                localName: specifier.local.name,
+                // @ts-ignore
+                exportedName: specifier.exported.name,
+                path: importInfo.path,
+                dependencies: new Set<string>(),
+              };
+              return;
+            }
+          }
           // @ts-ignore
           fileInfo.exports[specifier.exported.name] = {
             local: false,
@@ -139,7 +157,10 @@ function resolveExports(
             localName: specifier.local.name,
             // @ts-ignore
             exportedName: specifier.exported.name,
-            path: path.resolve(fileDir, node.source!.value as string),
+            path: strictResolveModulePath(
+              filePath,
+              node.source!.value as string
+            ),
             dependencies: new Set<string>(),
           };
         });
@@ -166,12 +187,25 @@ function resolveExports(
           },
         });
       } else if (node.declaration.type === 'Identifier') {
-        fileInfo.exports[DEFAULT_EXPORT_NAME] = {
-          local: true,
-          // @ts-ignore
-          name: node.declaration.name,
-          dependencies: fileInfo.functions[node.declaration.name].dependencies,
-        };
+        if (node.declaration.name in fileInfo.imports) {
+          fileInfo.exports[DEFAULT_EXPORT_NAME] = {
+            local: false,
+            localName: node.declaration.name,
+            exportedName: DEFAULT_EXPORT_NAME,
+            path: fileInfo.imports[node.declaration.name].path,
+            dependencies: new Set<string>(),
+          };
+          console.log(fileInfo.exports[DEFAULT_EXPORT_NAME]);
+        } else {
+          fileInfo.exports[DEFAULT_EXPORT_NAME] = {
+            local: true,
+            // @ts-ignore
+            name: node.declaration.name,
+            dependencies:
+              fileInfo.functions[node.declaration.name].dependencies ||
+              new Set<string>(),
+          };
+        }
       }
     },
     ExportAllDeclaration() {
