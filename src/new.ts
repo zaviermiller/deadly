@@ -243,8 +243,6 @@ function resolveImports(
   ast: ReturnType<typeof getAst>,
   filePath: string
 ) {
-  const fileDir = path.dirname(filePath);
-
   walk.simple(ast, {
     ImportDeclaration(node) {
       // console.dir(node, { depth: null });
@@ -264,14 +262,6 @@ function resolveImports(
           };
         }
       });
-      // const source = node.source.value;
-      // node.specifiers.forEach((specifier) => {
-      //   if (specifier.type === 'ImportDefaultSpecifier') {
-      //     fileInfo.imports[specifier.local.name] = { source, used: false };
-      //   } else if (specifier.type === 'ImportSpecifier') {
-      //     fileInfo.imports[specifier.local.name] = { source, used: false };
-      //   }
-      // });
     },
     VariableDeclarator(node) {
       if (
@@ -300,6 +290,13 @@ function resolveImports(
             };
           });
         }
+      } else if (node.init && node.init.type === 'ImportExpression') {
+        // @ts-ignore
+        fileInfo.imports[node.id.name] = {
+          default: true,
+          // @ts-ignore
+          path: resolveModulePath(filePath, node.init.source.value as string),
+        };
       }
     },
   });
@@ -358,12 +355,22 @@ function handleExportAlls(filePath: string, files: Record<string, FileNode>) {
   files[filePath] = file;
 }
 
+function extractVueScriptContent(content: string): string {
+  const scriptMatch = content.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+  return scriptMatch ? scriptMatch[1] : content;
+}
+
 function processFile(filePath: string, exportAllPaths: Set<string>) {
   if (!fs.existsSync(filePath)) {
     throw new Error(`File does not exist: ${filePath}`);
   }
 
-  const content = fs.readFileSync(filePath, 'utf-8');
+  let content;
+  if (path.extname(filePath) === '.vue') {
+    content = extractVueScriptContent(fs.readFileSync(filePath, 'utf-8'));
+  } else {
+    content = fs.readFileSync(filePath, 'utf-8');
+  }
 
   return analyzeFile(filePath, content, exportAllPaths);
 }
@@ -393,8 +400,6 @@ function processDirectory(
 export function findUnusedFiles(entryPath: string, srcDir: string) {
   const files: Record<string, FileNode> = {};
   processDirectory(srcDir, files);
-  // console.dir(files, { depth: null });
-  // return;
 
   const entrypoint = files[path.resolve(entryPath)];
   const unusedFiles = new Set(Object.keys(files));
@@ -441,10 +446,16 @@ export function findUnusedFiles(entryPath: string, srcDir: string) {
   return unusedFiles;
 }
 
-const testCase = 'defaultExport';
+// const testCase = 'dynamicImport';
 
-const entrypoint = path.resolve(`test/${testCase}/entrypoint.js`);
+// const entrypoint = path.resolve(`test/${testCase}/entrypoint.js`);
 
-const unused = findUnusedFiles(entrypoint, `test/${testCase}`);
+// const unused = findUnusedFiles(entrypoint, `test/${testCase}`);
 
-console.log(unused);
+// console.log(unused);
+
+// const entrypoint = path.resolve('../resaleai/apps/frontend/src/main.js');
+
+// const unused = findUnusedFiles(entrypoint, '../resaleai/apps/frontend/src');
+
+// console.log(unused);
