@@ -3,7 +3,7 @@ import path from 'path';
 import { parse } from 'acorn-loose';
 import * as walk from 'acorn-walk';
 
-type ExportInfo = { dependencies: string[] } & (
+type ExportInfo = { dependencies: Set<string> } & (
   | {
       local: false;
       path: string;
@@ -29,7 +29,7 @@ type ImportInfo = {
 );
 
 type FunctionInfo = {
-  dependencies: string[];
+  dependencies: Set<string>;
 };
 
 const DEFAULT_EXPORT_NAME = '1__default';
@@ -42,8 +42,11 @@ interface FileNode {
 
 function getAst(content: string) {
   return parse(content, {
-    ecmaVersion: 2020,
+    ecmaVersion: 'latest',
     sourceType: 'module',
+    allowReserved: true,
+    allowReturnOutsideFunction: true,
+    allowImportExportEverywhere: true,
   });
 }
 
@@ -99,21 +102,21 @@ function resolveExports(
               local: true,
               // @ts-ignore
               name: decl.id.name,
-              dependencies: [],
+              dependencies: new Set<string>(),
             };
           });
         } else if (node.declaration.type === 'FunctionDeclaration') {
           fileInfo.exports[node.declaration.id.name] = {
             local: true,
             name: node.declaration.id.name,
-            dependencies: [],
+            dependencies: new Set<string>(),
           };
 
           walk.simple(node.declaration, {
             Identifier(subNode) {
               if (subNode.name in fileInfo.imports) {
                 // @ts-ignore
-                fileInfo.exports[node.declaration.id.name].dependencies.push(
+                fileInfo.exports[node.declaration.id.name].dependencies.add(
                   subNode.name
                 );
               }
@@ -131,7 +134,7 @@ function resolveExports(
             // @ts-ignore
             exportedName: specifier.exported.name,
             path: path.resolve(fileDir, node.source!.value as string),
-            dependencies: [],
+            dependencies: new Set<string>(),
           };
         });
       }
@@ -143,14 +146,14 @@ function resolveExports(
           local: true,
           // @ts-ignore
           name: node.declaration.id.name,
-          dependencies: [],
+          dependencies: new Set<string>(),
         };
 
         walk.simple(node.declaration, {
           Identifier(subNode) {
             if (subNode.name in fileInfo.imports) {
               // @ts-ignore
-              fileInfo.exports[node.declaration.id.name].dependencies.push(
+              fileInfo.exports[node.declaration.id.name].dependencies.add(
                 subNode.name
               );
             }
@@ -184,7 +187,7 @@ function resolveExports(
                 local: true,
                 // @ts-ignore
                 name: prop.key.name,
-                dependencies: [],
+                dependencies: new Set<string>(),
               };
             }
           });
@@ -192,7 +195,7 @@ function resolveExports(
           fileInfo.exports[node.right.name] = {
             local: true,
             name: node.right.name,
-            dependencies: [],
+            dependencies: new Set<string>(),
           };
         }
       }
@@ -211,7 +214,7 @@ function resolveExports(
           local: true,
           // @ts-ignore
           name: node.property.name,
-          dependencies: [],
+          dependencies: new Set<string>(),
         };
       }
     },
@@ -223,14 +226,14 @@ function resolveFunctions(fileInfo: FileNode, ast: ReturnType<typeof getAst>) {
     FunctionDeclaration(node) {
       // @ts-ignore
       fileInfo.functions[node.id.name] = {
-        dependencies: [],
+        dependencies: new Set<string>(),
       };
 
       walk.simple(node, {
         Identifier(subNode) {
           if (subNode.name in fileInfo.imports) {
             // @ts-ignore
-            fileInfo.functions[node.id.name].dependencies.push(subNode.name);
+            fileInfo.functions[node.id.name].dependencies.add(subNode.name);
           }
         },
       });
@@ -346,7 +349,7 @@ function handleExportAlls(filePath: string, files: Record<string, FileNode>) {
           localName: exportName,
           exportedName: exportName,
           path: exportPath,
-          dependencies: [],
+          dependencies: new Set<string>(),
         };
       }
     },
@@ -417,11 +420,10 @@ export function findUnusedFiles(entryPath: string, srcDir: string) {
         if (!exportInfo.local) {
           // This is a re-export, recurse into the source file
           markUsed(exportInfo.path, new Set([exportInfo.localName]));
-        } else if (exportInfo.dependencies.length > 0) {
+        } else if (exportInfo.dependencies.size > 0) {
           // This is a local export, check its dependencies
           // markUsed(filePath, new Set(exportInfo.dependencies));
           for (const dep of exportInfo.dependencies) {
-            console.log(fileInfo.imports[dep]);
             markUsed(fileInfo.imports[dep].path, new Set([dep]));
           }
         }
