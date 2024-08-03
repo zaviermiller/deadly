@@ -1,5 +1,5 @@
 import fs from 'fs';
-import path from 'path';
+import path, { resolve } from 'path';
 import { parse } from 'acorn-loose';
 import * as walk from 'acorn-walk';
 
@@ -71,18 +71,24 @@ function resolveModulePath(filePath: string, modulePath: string) {
         return fullPath;
       }
     }
-
-    throw new Error(
-      `File does not exist: ${modulePath}. Tried ${extensions} and index/${indexExtensions}`
-    );
   } else {
     const fullPath = path.resolve(dirName, modulePath);
     if (fs.existsSync(fullPath)) {
       return fullPath;
-    } else {
-      throw new Error(`File does not exist: ${fullPath}`);
     }
   }
+}
+
+function strictResolveModulePath(filePath: string, modulePath: string) {
+  const resolvedPath = resolveModulePath(filePath, modulePath);
+
+  if (!resolvedPath) {
+    throw new Error(
+      `Could not resolve module path: ${path.dirname(filePath)}/${modulePath}`
+    );
+  }
+
+  return resolvedPath;
 }
 
 function resolveExports(
@@ -250,18 +256,25 @@ function resolveImports(
     ImportDeclaration(node) {
       // console.dir(node, { depth: null });
       node.specifiers.forEach((specifier) => {
+        const modulePath = resolveModulePath(
+          filePath,
+          node.source.value as string
+        );
+        if (!modulePath) {
+          return;
+        }
         if (specifier.type === 'ImportSpecifier') {
           // @ts-ignore
           fileInfo.imports[specifier.imported.name] = {
             default: false,
             // @ts-ignore
             name: specifier.imported.name,
-            path: resolveModulePath(filePath, node.source.value as string),
+            path: modulePath,
           };
         } else if (specifier.type === 'ImportDefaultSpecifier') {
           fileInfo.imports[specifier.local.name] = {
             default: true,
-            path: resolveModulePath(filePath, node.source.value as string),
+            path: modulePath,
           };
         }
       });
@@ -275,11 +288,15 @@ function resolveImports(
       ) {
         // @ts-ignore
         const source = node.init.arguments[0].value;
+        const modulePath = resolveModulePath(filePath, source);
+        if (!modulePath) {
+          return;
+        }
         if (node.id.type === 'Identifier') {
           // const module = require('module')
           fileInfo.imports[node.id.name] = {
             default: true,
-            path: resolveModulePath(filePath, source),
+            path: modulePath,
           };
         } else if (node.id.type === 'ObjectPattern') {
           // const { a, b } = require('module')
@@ -289,16 +306,24 @@ function resolveImports(
               default: false,
               // @ts-ignore
               name: prop.key.name,
-              path: resolveModulePath(filePath, source),
+              path: modulePath,
             };
           });
         }
       } else if (node.init && node.init.type === 'ImportExpression') {
+        const modulePath = resolveModulePath(
+          filePath,
+          // @ts-ignore
+          node.init.source.value as string
+        );
+        if (!modulePath) {
+          return;
+        }
         // @ts-ignore
         fileInfo.imports[node.id.name] = {
           default: true,
           // @ts-ignore
-          path: resolveModulePath(filePath, node.init.source.value as string),
+          path: modulePath,
         };
       }
     },
@@ -332,7 +357,7 @@ function handleExportAlls(filePath: string, files: Record<string, FileNode>) {
 
   walk.simple(ast, {
     ExportAllDeclaration(node) {
-      const exportPath = resolveModulePath(
+      const exportPath = strictResolveModulePath(
         filePath,
         node.source.value as string
       );
